@@ -1,3 +1,4 @@
+// src/pages/admin/TaskDetails.tsx
 import React, { useState, useEffect } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { Layout } from '../../components/Layout'
@@ -30,7 +31,10 @@ import {
   BarChart2,
   Briefcase,
   Tag,
-  CornerDownRight
+  CornerDownRight,
+  MessageSquare,
+  Send,
+  Paperclip
 } from 'lucide-react'
 import { pulseKeyframes } from '../../utils/animation'
 import { getDefaultProfileImage } from '../../utils/user'
@@ -53,6 +57,9 @@ export const TaskDetails: React.FC = () => {
   const [isActionViewOpen, setIsActionViewOpen] = useState(false)
   const [isDocumentViewOpen, setIsDocumentViewOpen] = useState(false)
   const [isEditMode, setIsEditMode] = useState(false)
+  const [activeSection, setActiveSection] = useState<'details' | 'actions' | 'comments'>('details')
+  const [comment, setComment] = useState('')
+  const [comments, setComments] = useState<any[]>([])
 
   useEffect(() => {
     const loadTask = async () => {
@@ -64,6 +71,7 @@ export const TaskDetails: React.FC = () => {
         }
         const fetchedTask = await taskService.getTaskById(taskId)
         setTask(fetchedTask)
+        setComments(fetchedTask.comments || [])
 
         const fetchedProject = await projectService.getProjectById(fetchedTask.projectId)
         setProject({ name: fetchedProject.name })
@@ -76,6 +84,15 @@ export const TaskDetails: React.FC = () => {
             userIds.push(action.completedBy)
           }
         })
+        
+        // Add comment author IDs
+        if (fetchedTask.comments) {
+          fetchedTask.comments.forEach(comment => {
+            if (comment.userId) {
+              userIds.push(comment.userId)
+            }
+          })
+        }
         
         const uniqueUserIds = Array.from(new Set(userIds)).filter(Boolean)
 
@@ -230,6 +247,28 @@ export const TaskDetails: React.FC = () => {
     setIsActionViewOpen(false)
   }
 
+  const handleAddComment = async () => {
+    if (!comment.trim() || !taskId || !currentUser) return;
+    
+    try {
+      const newComment = {
+        id: Date.now().toString(),
+        userId: currentUser.uid,
+        text: comment,
+        createdAt: Date.now()
+      };
+      
+      const updatedComments = [...comments, newComment];
+      setComments(updatedComments);
+      setComment('');
+      
+      await taskService.updateTask(taskId, { comments: updatedComments });
+    } catch (error) {
+      console.error("Error adding comment:", error);
+      setError("Failed to add comment.");
+    }
+  };
+
   if (isLoading) {
     return (
       <Layout role={currentUser?.role || 'employee'} isLoading={true}>
@@ -303,298 +342,3 @@ export const TaskDetails: React.FC = () => {
   }
 
   const statusInfo = getStatusInfo(task.status)
-
-  return (
-    <Layout role={currentUser?.role || 'employee'}>
-      <style>{pulseKeyframes}</style>
-      <div className="container mx-auto p-6">
-        {showConfetti && <Confetti onConfettiComplete={() => setFadeOut(false)} className={fadeOut ? 'fade-out-confetti' : ''} />}
-        
-        {/* Task Header */}
-        <div className="bg-white rounded-xl shadow-md p-6 mb-6">
-          <div className="flex justify-between items-start mb-4">
-            <button onClick={() => navigate(-1)} className="text-gray-600 hover:text-blue-600 p-2 -ml-2 rounded-full hover:bg-blue-50 transition-colors">
-              <ArrowLeft size={20} />
-            </button>
-            <span
-              className={`px-3 py-1 rounded-full text-sm font-medium flex items-center ${statusInfo.color} ${statusChanged ? 'animate-pulse' : ''}`}
-            >
-              {statusInfo.icon}
-              {statusInfo.label}
-            </span>
-          </div>
-
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">{task.title}</h1>
-          
-          <div className="flex flex-wrap gap-2 mb-4">
-            <span className={`px-3 py-1 rounded-full text-xs font-medium flex items-center ${getPriorityColor(task.priority)}`}>
-              <Tag size={14} className="mr-1" />
-              Prioridade: {task.priority === 'low' ? 'Baixa' : task.priority === 'medium' ? 'Média' : task.priority === 'high' ? 'Alta' : 'Crítica'}
-            </span>
-            
-            <span className="px-3 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 flex items-center">
-              <Award size={14} className="mr-1" />
-              {task.coinsReward} moedas
-            </span>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-            <div className="flex items-center">
-              <Calendar size={18} className="text-gray-500 mr-2" />
-              <div>
-                <p className="text-xs text-gray-500">Data de Vencimento</p>
-                <p className="text-sm font-medium">{formatDate(task.dueDate)}</p>
-              </div>
-            </div>
-            
-            <div className="flex items-center">
-              <User size={18} className="text-gray-500 mr-2" />
-              <div>
-                <p className="text-xs text-gray-500">Responsável</p>
-                <div className="flex items-center">
-                  <img
-                    src={users[task.assignedTo]?.profileImage || getDefaultProfileImage(users[task.assignedTo]?.name || null)}
-                    alt={users[task.assignedTo]?.name || 'Usuário Desconhecido'}
-                    className="w-5 h-5 rounded-full mr-1 object-cover"
-                  />
-                  <p className="text-sm font-medium">{users[task.assignedTo]?.name || 'Usuário Desconhecido'}</p>
-                </div>
-              </div>
-            </div>
-            
-            <div className="flex items-center">
-              <Briefcase size={18} className="text-gray-500 mr-2" />
-              <div>
-                <p className="text-xs text-gray-500">Projeto</p>
-                <p className="text-sm font-medium">
-                  <Link to={`/admin/projects/${task.projectId}`} className="text-blue-600 hover:underline">
-                    {project?.name || 'Projeto Desconhecido'}
-                  </Link>
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="mb-4">
-            <div className="flex justify-between items-center mb-1">
-              <span className="text-sm font-medium text-gray-700">Progresso</span>
-              <span className="text-sm text-gray-600">{completedActions} de {totalActions} ações</span>
-            </div>
-            <div className="w-full bg-gray-200 rounded-full h-2.5">
-              <div
-                className="bg-gradient-to-r from-blue-500 to-indigo-600 h-2.5 rounded-full transition-all duration-500"
-                style={{ width: `${progress}%` }}
-              />
-            </div>
-          </div>
-
-          <div className="mt-4 border-t pt-4">
-            <h2 className="text-lg font-semibold text-gray-800 mb-2">Descrição</h2>
-            <p className="text-gray-700 whitespace-pre-wrap">{task.description}</p>
-          </div>
-        </div>
-
-        {/* Actions Section */}
-        <div className="bg-white rounded-xl shadow-md p-6 mb-6">
-          <h2 className="text-xl font-semibold text-gray-800 mb-4 flex items-center">
-            <CheckCircle className="mr-2 text-blue-600" />
-            Ações
-          </h2>
-          
-          <div className="space-y-4">
-            {task.actions?.map((action) => (
-              <div 
-                key={action.id} 
-                className={`border rounded-lg p-4 transition-all ${
-                  action.completed 
-                    ? 'bg-green-50 border-green-200' 
-                    : 'bg-white border-gray-200 hover:border-blue-300 hover:shadow-sm'
-                }`}
-              >
-                <div className="flex justify-between items-start">
-                  <div className="flex items-start space-x-3">
-                    <div className={`p-2 rounded-full ${action.completed ? 'bg-green-100 text-green-600' : 'bg-blue-100 text-blue-600'}`}>
-                      {action.completed ? <Check size={18} /> : <Clock size={18} />}
-                    </div>
-                    <div>
-                      <h3 className="font-medium text-gray-900">{action.title}</h3>
-                      {action.completed && action.completedAt && (
-                        <p className="text-xs text-gray-500 mt-1">
-                          Concluído em {new Date(action.completedAt).toLocaleString('pt-BR')} por {
-                            action.completedBy ? users[action.completedBy]?.name || 'Usuário' : 'Usuário'
-                          }
-                        </p>
-                      )}
-                      {action.type === 'info' && (
-                        <div className="mt-2 text-sm text-gray-600">
-                          <p className="font-medium">{action.infoTitle}</p>
-                          <p className="line-clamp-2">{action.infoDescription}</p>
-                          {action.hasAttachments && action.data?.fileURLs?.length > 0 && (
-                            <p className="text-xs text-blue-600 mt-1">{action.data.fileURLs.length} arquivo(s) anexado(s)</p>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  
-                  <div className="flex space-x-2">
-                    {task.status !== 'waiting_approval' && task.status !== 'completed' && (
-                      <>
-                        {action.completed ? (
-                          <div className="flex space-x-1">
-                            <button
-                              onClick={() => handleViewActionDocument(action)}
-                              className="px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition flex items-center"
-                              title="Visualizar"
-                            >
-                              <Eye size={16} className="mr-1" />
-                              <span className="text-xs">Visualizar</span>
-                            </button>
-                            <button
-                              onClick={() => handleEditAction(action)}
-                              className="px-2 py-1 bg-purple-100 text-purple-700 rounded hover:bg-purple-200 transition flex items-center"
-                              title="Editar"
-                            >
-                              <Edit size={16} className="mr-1" />
-                              <span className="text-xs">Editar</span>
-                            </button>
-                            <button
-                              onClick={() => handleActionUncomplete(action.id)}
-                              className="px-2 py-1 bg-yellow-100 text-yellow-700 rounded hover:bg-yellow-200 transition flex items-center"
-                              title="Desfazer"
-                            >
-                              <CornerUpLeft size={16} className="mr-1" />
-                              <span className="text-xs">Desfazer</span>
-                            </button>
-                          </div>
-                        ) : (
-                          <button
-                            onClick={() => {
-                              setSelectedAction(action)
-                              setIsActionViewOpen(true)
-                              setIsEditMode(false)
-                            }}
-                            className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 transition flex items-center"
-                          >
-                            <CornerDownRight size={16} className="mr-1" />
-                            <span className="text-sm">Completar</span>
-                          </button>
-                        )}
-                      </>
-                    )}
-                    
-                    {(task.status === 'waiting_approval' || task.status === 'completed') && action.completed && (
-                      <button
-                        onClick={() => handleViewActionDocument(action)}
-                        className="px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition flex items-center"
-                        title="Visualizar"
-                      >
-                        <Eye size={16} className="mr-1" />
-                        <span className="text-xs">Visualizar</span>
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </div>
-            ))}
-            
-            {task.actions?.length === 0 && (
-              <div className="text-center py-8 bg-gray-50 rounded-lg border border-gray-200">
-                <FileText className="mx-auto h-12 w-12 text-gray-400 mb-2" />
-                <p className="text-gray-500">Nenhuma ação definida para esta tarefa.</p>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Attachments Section */}
-        {task.attachments && task.attachments.length > 0 && (
-          <div className="bg-white rounded-xl shadow-md p-6 mb-6">
-            <h2 className="text-xl font-semibold text-gray-800 mb-4 flex items-center">
-              <File className="mr-2 text-blue-600" />
-              Anexos
-            </h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-              {task.attachments.map((attachmentUrl, index) => (
-                <div key={index} className="flex items-center p-3 bg-gray-50 rounded-lg border border-gray-200">
-                  <AttachmentDisplay
-                    attachment={{
-                      id: index.toString(),
-                      name: attachmentUrl.substring(attachmentUrl.lastIndexOf('/') + 1),
-                      url: attachmentUrl,
-                      type: 'other',
-                    }}
-                  />
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Action Buttons */}
-        <div className="bg-white rounded-xl shadow-md p-6">
-          {allActionsCompleted && task.status !== 'waiting_approval' && task.status !== 'completed' && (
-            <button
-              onClick={handleSubmitForApproval}
-              className="w-full py-3 px-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition flex items-center justify-center"
-            >
-              <CheckCircle className="mr-2" />
-              Enviar para Aprovação
-            </button>
-          )}
-
-          {currentUser?.role === 'admin' && task.status === 'waiting_approval' && (
-            <div className="space-y-3">
-              <button
-                onClick={handleCompleteTask}
-                className="w-full py-3 px-4 bg-green-600 text-white rounded-lg hover:bg-green-700 transition flex items-center justify-center"
-              >
-                <CheckCircle className="mr-2" />
-                Aprovar Tarefa ({task.coinsReward} Moedas)
-              </button>
-              <button
-                onClick={handleRevertToPending}
-                className="w-full py-3 px-4 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition flex items-center justify-center"
-              >
-                <CornerUpLeft className="mr-2" />
-                Voltar para Pendente
-              </button>
-            </div>
-          )}
-        </div>
-
-        {/* Action View Modal */}
-        {selectedAction && (
-          <ActionView
-            action={selectedAction}
-            onComplete={handleActionComplete}
-            onCancel={() => {
-              setSelectedAction(null)
-              setIsActionViewOpen(false)
-              setIsEditMode(false)
-            }}
-            taskId={taskId!}
-            isOpen={isActionViewOpen}
-            isEditMode={isEditMode}
-          />
-        )}
-
-        {/* Action Document Modal */}
-        {selectedAction && (
-          <ActionDocument
-            action={selectedAction}
-            onClose={() => {
-              setSelectedAction(null)
-              setIsDocumentViewOpen(false)
-            }}
-            taskTitle={task.title}
-            projectName={project?.name || 'Projeto Desconhecido'}
-            userName={selectedAction.completedBy ? users[selectedAction.completedBy]?.name : undefined}
-            userPhotoURL={selectedAction.completedBy ? users[selectedAction.completedBy]?.profileImage : undefined}
-            isOpen={isDocumentViewOpen}
-          />
-        )}
-      </div>
-    </Layout>
-  )
-}
