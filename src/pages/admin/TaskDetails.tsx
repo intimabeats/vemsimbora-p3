@@ -342,3 +342,402 @@ export const TaskDetails: React.FC = () => {
   }
 
   const statusInfo = getStatusInfo(task.status)
+  // Continuação do arquivo TaskDetails.tsx
+
+  return (
+    <Layout role={currentUser?.role || 'employee'}>
+      <div className="container mx-auto p-6">
+        {/* Back Button */}
+        <div className="flex items-center mb-6">
+          <button 
+            onClick={() => navigate(-1)} 
+            className="flex items-center text-gray-600 hover:text-blue-600 transition-colors"
+          >
+            <ArrowLeft size={20} className="mr-2" /> Voltar
+          </button>
+        </div>
+
+        {/* Task Header */}
+        <div className="bg-white rounded-xl shadow-md p-6 mb-6 border border-gray-100">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-4">
+            <div>
+              <div className="flex items-center">
+                <h1 className="text-2xl font-bold text-gray-800 mr-3">{task.title}</h1>
+                <div className={`px-3 py-1 rounded-full text-xs font-medium ${statusInfo.color}`}>
+                  <div className="flex items-center">
+                    {statusInfo.icon}
+                    {statusInfo.label}
+                  </div>
+                </div>
+              </div>
+              <p className="text-gray-600 mt-2">{task.description}</p>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-2">
+              {task.status === 'pending' && allActionsCompleted && (
+                <button
+                  onClick={handleSubmitForApproval}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition flex items-center"
+                >
+                  <CheckCircle size={18} className="mr-2" /> Enviar para Aprovação
+                </button>
+              )}
+              {task.status === 'waiting_approval' && currentUser?.role === 'admin' && (
+                <button
+                  onClick={handleCompleteTask}
+                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition flex items-center"
+                >
+                  <CheckCircle size={18} className="mr-2" /> Aprovar Tarefa
+                </button>
+              )}
+              {task.status === 'waiting_approval' && currentUser?.role === 'admin' && (
+                <button
+                  onClick={handleRevertToPending}
+                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition flex items-center"
+                >
+                  <XCircle size={18} className="mr-2" /> Rejeitar
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+            <div className="flex items-center space-x-2">
+              <User className="text-blue-500" />
+              <div>
+                <span className="text-sm text-gray-500">Responsável</span>
+                <p className="font-medium">{users[task.assignedTo]?.name || 'Não atribuído'}</p>
+              </div>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Calendar className="text-green-500" />
+              <div>
+                <span className="text-sm text-gray-500">Data de Início</span>
+                <p className="font-medium">{formatDate(task.startDate)}</p>
+              </div>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Calendar className="text-red-500" />
+              <div>
+                <span className="text-sm text-gray-500">Data de Vencimento</span>
+                <p className="font-medium">{formatDate(task.dueDate)}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Progress */}
+          <div className="mt-6">
+            <div className="flex justify-between items-center mb-2">
+              <span className="text-sm text-gray-500">Progresso da Tarefa</span>
+              <span className="text-sm font-medium text-blue-600">
+                {progress.toFixed(0)}%
+              </span>
+            </div>
+            <div className="w-full bg-gray-200 rounded-full h-2.5 overflow-hidden">
+              <div
+                className="bg-gradient-to-r from-blue-500 to-indigo-600 h-2.5 rounded-full transition-all duration-500"
+                style={{ width: `${progress}%` }}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Navigation Tabs */}
+        <div className="flex border-b border-gray-200 mb-6">
+          <button
+            className={`px-4 py-2 font-medium text-sm ${
+              activeSection === 'details'
+                ? 'text-blue-600 border-b-2 border-blue-600'
+                : 'text-gray-500 hover:text-gray-700'
+            }`}
+            onClick={() => setActiveSection('details')}
+          >
+            Detalhes
+          </button>
+          <button
+            className={`px-4 py-2 font-medium text-sm ${
+              activeSection === 'actions'
+                ? 'text-blue-600 border-b-2 border-blue-600'
+                : 'text-gray-500 hover:text-gray-700'
+            }`}
+            onClick={() => setActiveSection('actions')}
+          >
+            Ações ({completedActions}/{totalActions})
+          </button>
+          <button
+            className={`px-4 py-2 font-medium text-sm ${
+              activeSection === 'comments'
+                ? 'text-blue-600 border-b-2 border-blue-600'
+                : 'text-gray-500 hover:text-gray-700'
+            }`}
+            onClick={() => setActiveSection('comments')}
+          >
+            Comentários ({comments.length})
+          </button>
+        </div>
+
+        {/* Details Section */}
+        {activeSection === 'details' && (
+          <div className="bg-white rounded-xl shadow-md p-6 mb-6 border border-gray-100">
+            <h2 className="text-xl font-semibold mb-4 flex items-center">
+              <FileText className="mr-2 text-blue-600" /> Detalhes da Tarefa
+            </h2>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <h3 className="font-medium text-gray-700 mb-2">Informações Gerais</h3>
+                <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-sm text-gray-500">Projeto</p>
+                      <p className="font-medium">{project?.name || 'N/A'}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-500">Prioridade</p>
+                      <p className={`font-medium px-2 py-1 rounded-full text-xs inline-block ${getPriorityColor(task.priority)}`}>
+                        {task.priority.charAt(0).toUpperCase() + task.priority.slice(1)}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-500">Criado por</p>
+                      <p className="font-medium">{users[task.createdBy]?.name || 'N/A'}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-500">Criado em</p>
+                      <p className="font-medium">{formatDate(task.createdAt)}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              <div>
+                <h3 className="font-medium text-gray-700 mb-2">Recompensa</h3>
+                <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-gray-500">Moedas</p>
+                      <p className="font-medium text-amber-600 flex items-center">
+                        <Award className="mr-1" size={16} />
+                        {task.coinsReward}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-500">Nível de Dificuldade</p>
+                      <p className="font-medium">{task.difficultyLevel}/9</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Actions Section */}
+        {activeSection === 'actions' && (
+          <div className="bg-white rounded-xl shadow-md p-6 mb-6 border border-gray-100">
+            <h2 className="text-xl font-semibold mb-4 flex items-center">
+              <CheckCircle className="mr-2 text-blue-600" /> Ações da Tarefa
+            </h2>
+            
+            {task.actions.length === 0 ? (
+              <div className="text-center py-8 bg-gray-50 rounded-lg border border-gray-200">
+                <CheckCircle className="mx-auto h-12 w-12 text-gray-400" />
+                <h3 className="mt-2 text-lg font-medium text-gray-900">Nenhuma ação encontrada</h3>
+                <p className="mt-1 text-sm text-gray-500">Esta tarefa não possui ações definidas.</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {task.actions.map((action) => (
+                  <div 
+                    key={action.id} 
+                    className={`border rounded-lg overflow-hidden transition-all ${
+                      action.completed 
+                        ? 'border-green-200 bg-green-50' 
+                        : 'border-gray-200 hover:border-blue-200 hover:bg-blue-50'
+                    }`}
+                  >
+                    <div className="p-4">
+                      <div className="flex justify-between items-start">
+                        <div className="flex items-start space-x-3">
+                          <div className={`p-2 rounded-full ${
+                            action.completed 
+                              ? 'bg-green-100 text-green-600' 
+                              : 'bg-gray-100 text-gray-600'
+                          }`}>
+                            {action.completed ? <CheckCircle size={20} /> : <Clock size={20} />}
+                          </div>
+                          <div>
+                            <h3 className="font-medium text-gray-900">{action.title}</h3>
+                            <p className="text-sm text-gray-500 mt-1">
+                              {action.type === 'document' 
+                                ? `Documento com ${action.data?.steps?.length || 0} campos` 
+                                : action.description}
+                            </p>
+                            {action.completed && (
+                              <div className="flex items-center mt-2 text-xs text-green-600">
+                                <CheckCircle size={14} className="mr-1" />
+                                <span>
+                                  Concluído em {action.completedAt ? new Date(action.completedAt).toLocaleString() : 'N/A'}
+                                  {action.completedBy && ` por ${users[action.completedBy]?.name || 'Usuário'}`}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex space-x-2">
+                          {action.completed ? (
+                            <>
+                              <button
+                                onClick={() => handleViewActionDocument(action)}
+                                className="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-full transition-colors"
+                                title="Ver Documento"
+                              >
+                                <Eye size={18} />
+                              </button>
+                              {(currentUser?.role === 'admin' || currentUser?.role === 'manager') && (
+                                <button
+                                  onClick={() => handleActionUncomplete(action.id)}
+                                  className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-full transition-colors"
+                                  title="Marcar como Não Concluído"
+                                >
+                                  <XCircle size={18} />
+                                </button>
+                              )}
+                            </>
+                          ) : (
+                            <>
+                              <button
+                                onClick={() => {
+                                  setSelectedAction(action);
+                                  setIsActionViewOpen(true);
+                                }}
+                                className="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-full transition-colors"
+                                title="Completar Ação"
+                              >
+                                <CheckCircle size={18} />
+                              </button>
+                              {(currentUser?.role === 'admin' || currentUser?.role === 'manager') && (
+                                <button
+                                  onClick={() => handleEditAction(action)}
+                                  className="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-full transition-colors"
+                                  title="Editar Ação"
+                                >
+                                  <Edit size={18} />
+                                </button>
+                              )}
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Comments Section */}
+        {activeSection === 'comments' && (
+          <div className="bg-white rounded-xl shadow-md p-6 mb-6 border border-gray-100">
+            <h2 className="text-xl font-semibold mb-4 flex items-center">
+              <MessageSquare className="mr-2 text-blue-600" /> Comentários
+            </h2>
+            
+            <div className="mb-4">
+              <div className="flex space-x-2">
+                <textarea
+                  value={comment}
+                  onChange={(e) => setComment(e.target.value)}
+                  placeholder="Adicione um comentário..."
+                  className="flex-grow px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                  rows={3}
+                />
+                <button
+                  onClick={handleAddComment}
+                  disabled={!comment.trim()}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition flex items-center self-end disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <Send size={18} className="mr-2" /> Enviar
+                </button>
+              </div>
+            </div>
+            
+            {comments.length === 0 ? (
+              <div className="text-center py-8 bg-gray-50 rounded-lg border border-gray-200">
+                <MessageSquare className="mx-auto h-12 w-12 text-gray-400" />
+                <h3 className="mt-2 text-lg font-medium text-gray-900">Nenhum comentário</h3>
+                <p className="mt-1 text-sm text-gray-500">Seja o primeiro a comentar nesta tarefa.</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {comments.map((comment) => (
+                  <div key={comment.id} className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                    <div className="flex items-start space-x-3">
+                      <img
+                        src={users[comment.userId]?.profileImage || getDefaultProfileImage(users[comment.userId]?.name)}
+                        alt={users[comment.userId]?.name || 'Usuário'}
+                        className="w-10 h-10 rounded-full object-cover"
+                      />
+                      <div className="flex-grow">
+                        <div className="flex justify-between items-center">
+                          <h4 className="font-medium text-gray-900">{users[comment.userId]?.name || 'Usuário'}</h4>
+                          <span className="text-xs text-gray-500">
+                            {new Date(comment.createdAt).toLocaleString()}
+                          </span>
+                        </div>
+                        <p className="text-gray-700 mt-1">{comment.text}</p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Action View Modal */}
+      {selectedAction && (
+        <ActionView
+          action={selectedAction}
+          onComplete={handleActionComplete}
+          onCancel={() => {
+            setSelectedAction(null);
+            setIsActionViewOpen(false);
+            setIsEditMode(false);
+          }}
+          taskId={task.id}
+          isOpen={isActionViewOpen}
+          isEditMode={isEditMode}
+        />
+      )}
+
+      {/* Action Document View Modal */}
+      {selectedAction && (
+        <ActionDocument
+          action={selectedAction}
+          onClose={() => {
+            setSelectedAction(null);
+            setIsDocumentViewOpen(false);
+          }}
+          taskTitle={task.title}
+          projectName={project?.name || 'Projeto'}
+          userName={selectedAction.completedBy ? users[selectedAction.completedBy]?.name : undefined}
+          userPhotoURL={selectedAction.completedBy ? users[selectedAction.completedBy]?.profileImage : undefined}
+          isOpen={isDocumentViewOpen}
+        />
+      )}
+
+      {/* Confetti for task completion */}
+      {showConfetti && (
+        <Confetti
+          width={window.innerWidth}
+          height={window.innerHeight}
+          recycle={!fadeOut}
+          numberOfPieces={200}
+          className={fadeOut ? 'fade-out-confetti' : ''}
+        />
+      )}
+    </Layout>
+  )
+}
