@@ -1,11 +1,13 @@
-// src/components/ActionView.tsx
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { TaskAction } from '../types/firestore-schema';
 import { 
   Save, X, Plus, Trash2, FileText, Type, List, 
   Calendar, Image, Video, Mic, Info, Check,
-  Upload, AlertCircle, Loader2, Camera, File
+  Upload, AlertCircle, Loader2, Camera, File,
+  Paperclip
 } from 'lucide-react';
+import { storage } from '../config/firebase';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 interface ActionViewProps {
   action: TaskAction;
@@ -32,7 +34,6 @@ export const ActionView: React.FC<ActionViewProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textAreaRef = useRef<HTMLTextAreaElement>(null);
   
-  // Reset state when action changes
   useEffect(() => {
     setEditedAction({...action});
     setFiles([]);
@@ -40,7 +41,6 @@ export const ActionView: React.FC<ActionViewProps> = ({
     setUploadProgress(0);
   }, [action]);
 
-  // Auto-resize textarea
   useEffect(() => {
     if (textAreaRef.current) {
       textAreaRef.current.style.height = 'auto';
@@ -48,7 +48,6 @@ export const ActionView: React.FC<ActionViewProps> = ({
     }
   }, [editedAction.description, editedAction.infoDescription]);
 
-  // Focus on first input when modal opens
   useEffect(() => {
     if (isOpen) {
       setTimeout(() => {
@@ -72,26 +71,13 @@ export const ActionView: React.FC<ActionViewProps> = ({
     setError(null);
     
     try {
-      // Prepare data for submission
       const data: any = { ...editedAction };
       
-      // Handle file uploads if there are any
-      if (files.length > 0 && (editedAction.type === 'info' && editedAction.hasAttachments)) {
-        // In a real implementation, you would upload files here
-        // For now, we'll simulate a file upload
-        simulateFileUpload();
-        
-        // In a real implementation, you would get URLs back from the upload
-        // and add them to the data
-        data.attachments = files.map((file, index) => ({
-          id: `file-${index}`,
-          name: file.name,
-          url: URL.createObjectURL(file),
-          type: getFileType(file)
-        }));
+      if (files.length > 0) {
+        const uploadedFiles = await Promise.all(files.map(file => uploadFile(file)));
+        data.attachments = uploadedFiles;
       }
       
-      // Call the onComplete callback with the data
       onComplete(editedAction.id, data);
     } catch (err: any) {
       setError(err.message || 'Failed to save action');
@@ -101,7 +87,6 @@ export const ActionView: React.FC<ActionViewProps> = ({
   };
 
   const validateForm = (): boolean => {
-    // Basic validation
     if (!editedAction.title.trim()) {
       setError('Title is required');
       return false;
@@ -121,7 +106,6 @@ export const ActionView: React.FC<ActionViewProps> = ({
       return false;
     }
     
-    // If attachments are required but none are provided
     if (editedAction.type === 'info' && editedAction.hasAttachments && files.length === 0 && !editedAction.data?.fileURLs?.length) {
       setError('Please attach at least one file');
       return false;
@@ -130,19 +114,17 @@ export const ActionView: React.FC<ActionViewProps> = ({
     return true;
   };
 
-  const simulateFileUpload = () => {
-    const totalFiles = files.length;
-    let filesProcessed = 0;
+  const uploadFile = async (file: File): Promise<{ id: string; name: string; url: string; type: string }> => {
+    const storageRef = ref(storage, `tasks/${taskId}/attachments/${Date.now()}_${file.name}`);
+    await uploadBytes(storageRef, file);
+    const downloadURL = await getDownloadURL(storageRef);
     
-    const interval = setInterval(() => {
-      filesProcessed++;
-      const progress = Math.round((filesProcessed / totalFiles) * 100);
-      setUploadProgress(progress);
-      
-      if (filesProcessed >= totalFiles) {
-        clearInterval(interval);
-      }
-    }, 500);
+    return {
+      id: Date.now().toString(),
+      name: file.name,
+      url: downloadURL,
+      type: file.type.split('/')[0] // 'image', 'video', etc.
+    };
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -156,26 +138,13 @@ export const ActionView: React.FC<ActionViewProps> = ({
     setFiles(prev => prev.filter((_, i) => i !== index));
   };
 
-  const getFileType = (file: File): 'image' | 'video' | 'document' | 'link' | 'other' | 'audio' => {
-    if (file.type.startsWith('image/')) return 'image';
-    if (file.type.startsWith('video/')) return 'video';
-    if (file.type.startsWith('audio/')) return 'audio';
-    if (file.type.includes('pdf') || file.type.includes('document') || file.type.includes('text')) return 'document';
-    return 'other';
-  };
-
   const getFileIcon = (file: File) => {
-    const type = getFileType(file);
-    switch (type) {
-      case 'image': return <Image size={16} className="text-blue-500" />;
-      case 'video': return <Video size={16} className="text-red-500" />;
-      case 'audio': return <Mic size={16} className="text-purple-500" />;
-      case 'document': return <FileText size={16} className="text-orange-500" />;
-      default: return <File size={16} className="text-gray-500" />;
-    }
+    if (file.type.startsWith('image/')) return <Image size={16} className="text-blue-500" />;
+    if (file.type.startsWith('video/')) return <Video size={16} className="text-red-500" />;
+    if (file.type.startsWith('audio/')) return <Mic size={16} className="text-purple-500" />;
+    return <File size={16} className="text-gray-500" />;
   };
 
-  // Render fields based on action type
   const renderTypeSpecificFields = () => {
     switch (editedAction.type) {
       case 'info':
@@ -259,6 +228,14 @@ export const ActionView: React.FC<ActionViewProps> = ({
                             {url.split('/').pop() || `File ${index + 1}`}
                           </span>
                         </div>
+                        <a
+                          href={url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-600 hover:text-blue-800"
+                        >
+                          Ver
+                        </a>
                       </div>
                     ))}
                   </div>
