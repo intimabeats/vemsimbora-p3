@@ -34,7 +34,8 @@ import {
   CornerDownRight,
   MessageSquare,
   Send,
-  Paperclip
+  Paperclip,
+  Download
 } from 'lucide-react'
 import { pulseKeyframes } from '../../utils/animation'
 import { getDefaultProfileImage } from '../../utils/user'
@@ -60,6 +61,7 @@ export const TaskDetails: React.FC = () => {
   const [activeSection, setActiveSection] = useState<'details' | 'actions' | 'comments'>('details')
   const [comment, setComment] = useState('')
   const [comments, setComments] = useState<any[]>([])
+  const [currentStep, setCurrentStep] = useState(0)
 
   useEffect(() => {
     const loadTask = async () => {
@@ -78,14 +80,12 @@ export const TaskDetails: React.FC = () => {
 
         const userIds = [fetchedTask.assignedTo, fetchedTask.createdBy]
         
-        // Add completedBy IDs from actions
         fetchedTask.actions.forEach(action => {
           if (action.completedBy) {
             userIds.push(action.completedBy)
           }
         })
         
-        // Add comment author IDs
         if (fetchedTask.comments) {
           fetchedTask.comments.forEach(comment => {
             if (comment.userId) {
@@ -216,6 +216,9 @@ export const TaskDetails: React.FC = () => {
         } else {
           console.warn("Could not find original submission message to update.")
         }
+
+        // Move task files to project after approval
+        await taskService.moveFilesToProjectAfterApproval(taskId!, updatedTask.projectId)
       }
     } catch (error) {
       console.error("Error completing task:", error)
@@ -309,10 +312,8 @@ export const TaskDetails: React.FC = () => {
     return new Date(timestamp).toLocaleDateString('pt-BR')
   }
 
-  // Calculate allActionsCompleted
   const allActionsCompleted = task.actions?.length > 0 && task.actions.every(action => action.completed)
 
-  // Get priority color
   const getPriorityColor = (priority: TaskSchema['priority']) => {
     switch (priority) {
       case 'low': return 'bg-green-100 text-green-800'
@@ -323,7 +324,6 @@ export const TaskDetails: React.FC = () => {
     }
   }
 
-  // Get status color and label
   const getStatusInfo = (status: TaskSchema['status']) => {
     switch (status) {
       case 'pending':
@@ -342,8 +342,6 @@ export const TaskDetails: React.FC = () => {
   }
 
   const statusInfo = getStatusInfo(task.status)
-  // Continuação do arquivo TaskDetails.tsx
-
   return (
     <Layout role={currentUser?.role || 'employee'}>
       <div className="container mx-auto p-6">
@@ -546,7 +544,7 @@ export const TaskDetails: React.FC = () => {
               </div>
             ) : (
               <div className="space-y-4">
-                {task.actions.map((action) => (
+                {task.actions.map((action, index) => (
                   <div 
                     key={action.id} 
                     className={`border rounded-lg overflow-hidden transition-all ${
@@ -628,6 +626,47 @@ export const TaskDetails: React.FC = () => {
                           )}
                         </div>
                       </div>
+                      
+                      {/* Display attachments for info type actions */}
+                      {action.type === 'info' && action.data?.fileURLs && action.data.fileURLs.length > 0 && (
+                        <div className="mt-4">
+                          <h4 className="text-sm font-medium text-gray-700 mb-2">Anexos:</h4>
+                          <div className="flex flex-wrap gap-2">
+                            {action.data.fileURLs.map((url, idx) => (
+                              <a
+                                key={idx}
+                                href={url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center px-3 py-2 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                              >
+                                <Paperclip size={16} className="mr-2 text-gray-600" />
+                                <span className="text-sm text-gray-700">Anexo {idx + 1}</span>
+                              </a>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Display uploaded files for file_upload type actions */}
+                      {action.type === 'file_upload' && action.data?.uploadedFiles && action.data.uploadedFiles.length > 0 && (
+                        <div className="mt-4">
+                          <h4 className="text-sm font-medium text-gray-700 mb-2">Arquivos Carregados:</h4>
+                          <div className="flex flex-wrap gap-2">
+                            {action.data.uploadedFiles.map((file, idx) => (
+                              <a
+                                key={idx}
+                                href={file.url}
+                                download={file.name}
+                                className="flex items-center px-3 py-2 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                              >
+                                <Download size={16} className="mr-2 text-gray-600" />
+                                <span className="text-sm text-gray-700">{file.name}</span>
+                              </a>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))}
