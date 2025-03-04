@@ -14,7 +14,10 @@ import {
   Clock,
   Flag,
   Award,
-  Briefcase
+  Briefcase,
+  Info,
+  Eye,
+  HelpCircle
 } from 'lucide-react'
 import { taskService } from '../../services/TaskService'
 import { projectService } from '../../services/ProjectService'
@@ -48,9 +51,11 @@ export const CreateProjectTask: React.FC = () => {
 
   const [users, setUsers] = useState<{ id: string, name: string }[]>([])
   const [coinsReward, setCoinsReward] = useState(0)
-  const [templates, setTemplates] = useState<{ id: string, title: string }[]>([]);
+  const [templates, setTemplates] = useState<{ id: string, title: string, description: string }[]>([]);
   const [selectedTemplate, setSelectedTemplate] = useState('');
   const [projectName, setProjectName] = useState('');
+  const [previewTemplate, setPreviewTemplate] = useState<any>(null);
+  const [showTemplateInfo, setShowTemplateInfo] = useState(false);
 
   useEffect(() => {
     if (projectId) {
@@ -76,7 +81,13 @@ export const CreateProjectTask: React.FC = () => {
 
         setUsers(usersRes.data.map(u => ({ id: u.id, name: u.name })))
         setCoinsReward(Math.round(settings.taskCompletionBase * formData.difficultyLevel * settings.complexityMultiplier))
-        setTemplates(templatesRes.map(t => ({ id: t.id, title: t.title })));
+        
+        // Enhanced template data with descriptions
+        setTemplates(templatesRes.map(t => ({ 
+          id: t.id, 
+          title: t.title,
+          description: t.description || 'Sem descrição disponível'
+        })));
       } catch (err) {
         setError('Falha ao carregar dados')
       }
@@ -85,10 +96,26 @@ export const CreateProjectTask: React.FC = () => {
     loadData()
   }, [formData.difficultyLevel])
 
+  // Load template preview when a template is selected
+  useEffect(() => {
+    if (selectedTemplate) {
+      actionTemplateService.getActionTemplateById(selectedTemplate)
+        .then(template => {
+          setPreviewTemplate(template);
+        })
+        .catch(err => {
+          console.error("Error loading template preview:", err);
+          setError("Falha ao carregar visualização do modelo");
+        });
+    } else {
+      setPreviewTemplate(null);
+    }
+  }, [selectedTemplate]);
   const validateForm = () => {
     const errors: { [key: string]: string } = {}
     if (!formData.title.trim()) errors.title = 'Título é obrigatório'
     if (!formData.description.trim()) errors.description = 'Descrição é obrigatória'
+    if (!formData.projectId) errors.projectId = 'Projeto é obrigatório'
     if (!formData.assignedTo) errors.assignedTo = 'Um responsável é obrigatório'
     if (!formData.startDate) errors.startDate = 'Data de início é obrigatória'
     if (!formData.dueDate) errors.dueDate = 'Data de vencimento é obrigatória'
@@ -125,7 +152,7 @@ export const CreateProjectTask: React.FC = () => {
         title: fullTemplate.title,
         type: 'document',
         completed: false,
-        description: fullTemplate.elements.map(e => e.description).join(' '),
+        description: fullTemplate.elements.map(e => e.description || '').filter(Boolean).join(' '),
         data: { steps: deepCopy(fullTemplate.elements) },
       };
 
@@ -136,6 +163,7 @@ export const CreateProjectTask: React.FC = () => {
       
       // Reset the selected template after adding
       setSelectedTemplate('');
+      setPreviewTemplate(null);
     } catch (error) {
       console.error("Error adding action from template:", error);
       setError("Failed to add action from template.");
@@ -184,6 +212,98 @@ export const CreateProjectTask: React.FC = () => {
       setError(err.message || 'Failed to create task');
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Helper function to render field preview based on type
+  const renderFieldPreview = (field: any) => {
+    switch (field.type) {
+      case 'text':
+        return (
+          <div className="mb-3">
+            <label className="block text-sm font-medium text-gray-700 mb-1">{field.label}</label>
+            <input 
+              type="text" 
+              disabled 
+              placeholder={field.placeholder || "Texto curto"} 
+              className="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md text-gray-500"
+            />
+            {field.description && <p className="mt-1 text-xs text-gray-500">{field.description}</p>}
+          </div>
+        );
+      case 'long_text':
+        return (
+          <div className="mb-3">
+            <label className="block text-sm font-medium text-gray-700 mb-1">{field.label}</label>
+            <textarea 
+              disabled 
+              placeholder={field.placeholder || "Texto longo"} 
+              className="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md text-gray-500 h-20"
+            ></textarea>
+            {field.description && <p className="mt-1 text-xs text-gray-500">{field.description}</p>}
+          </div>
+        );
+      case 'date':
+        return (
+          <div className="mb-3">
+            <label className="block text-sm font-medium text-gray-700 mb-1">{field.label}</label>
+            <input 
+              type="date" 
+              disabled 
+              className="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md text-gray-500"
+            />
+            {field.description && <p className="mt-1 text-xs text-gray-500">{field.description}</p>}
+          </div>
+        );
+      case 'select':
+        return (
+          <div className="mb-3">
+            <label className="block text-sm font-medium text-gray-700 mb-1">{field.label}</label>
+            <select 
+              disabled 
+              className="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md text-gray-500"
+            >
+              <option value="">Selecione uma opção</option>
+              {field.options?.map((option: string, i: number) => (
+                <option key={i} value={option}>{option}</option>
+              ))}
+            </select>
+            {field.description && <p className="mt-1 text-xs text-gray-500">{field.description}</p>}
+          </div>
+        );
+      case 'checkbox':
+        return (
+          <div className="mb-3">
+            <div className="flex items-center">
+              <input
+                type="checkbox"
+                disabled
+                className="h-4 w-4 text-blue-600 border-gray-300 rounded"
+              />
+              <label className="ml-2 block text-sm text-gray-700">{field.label}</label>
+            </div>
+            {field.description && <p className="mt-1 text-xs text-gray-500 ml-6">{field.description}</p>}
+          </div>
+        );
+      case 'file_upload':
+        return (
+          <div className="mb-3">
+            <label className="block text-sm font-medium text-gray-700 mb-1">{field.label}</label>
+            <div className="border border-dashed border-gray-300 rounded-md p-4 text-center bg-gray-50">
+              <p className="text-sm text-gray-500">Clique para fazer upload ou arraste arquivos</p>
+            </div>
+            {field.description && <p className="mt-1 text-xs text-gray-500">{field.description}</p>}
+          </div>
+        );
+      case 'info':
+        return (
+          <div className="mb-3 p-3 bg-blue-50 border-l-4 border-blue-500 rounded-md">
+            <h5 className="font-medium text-blue-700">{field.label}</h5>
+            <p className="text-sm text-blue-600 mt-1">{field.description}</p>
+          </div>
+        );
+      default:
+        return <div className="mb-3 text-sm text-gray-500">Tipo de campo não suportado: {field.type}</div>;
     }
   };
 
@@ -372,7 +492,7 @@ export const CreateProjectTask: React.FC = () => {
               </div>
             </div>
 
-            {/* Action Templates */}
+            {/* Action Templates Section */}
             <div className="border-t border-gray-200 pt-6">
               <div className="flex justify-between items-center mb-4">
                 <label className="block text-sm font-medium text-gray-700 flex items-center">
@@ -392,27 +512,71 @@ export const CreateProjectTask: React.FC = () => {
               </div>
               
               <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 mb-4">
-                <div className="flex space-x-2">
-                  <select
-                    value={selectedTemplate}
-                    onChange={(e) => setSelectedTemplate(e.target.value)}
-                    className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="">Selecione um Modelo de Ação</option>
-                    {templates.map(template => (
-                      <option key={template.id} value={template.id}>
-                        {template.title}
-                      </option>
-                    ))}
-                  </select>
-                  <button
-                    type="button"
-                    onClick={handleAddActionFromTemplate}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition flex items-center"
-                    disabled={!selectedTemplate}
-                  >
-                    <Plus size={18} className="mr-1" /> Adicionar
-                  </button>
+                <div className="flex flex-col space-y-4">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-sm font-medium text-gray-700">
+                      Selecione um Modelo de Ação
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setShowTemplateInfo(!showTemplateInfo)}
+                      className="text-blue-600 hover:text-blue-800 p-1 rounded-full hover:bg-blue-50"
+                    >
+                      <HelpCircle size={16} />
+                    </button>
+                  </div>
+                  
+                  {showTemplateInfo && (
+                    <div className="bg-blue-50 p-3 rounded-lg border border-blue-100 text-sm text-blue-800 mb-2">
+                      <p className="font-medium mb-1">O que são modelos de ação?</p>
+                      <p>Modelos de ação definem os campos que o usuário deverá preencher ao realizar uma tarefa. 
+                      Ao adicionar um modelo, você está criando um formulário estruturado que o responsável pela tarefa deverá completar.</p>
+                    </div>
+                  )}
+                  
+                  <div className="flex space-x-2">
+                    <select
+                      value={selectedTemplate}
+                      onChange={(e) => setSelectedTemplate(e.target.value)}
+                      className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="">Selecione um Modelo</option>
+                      {templates.map(template => (
+                        <option key={template.id} value={template.id}>
+                          {template.title}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      onClick={handleAddActionFromTemplate}
+                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition flex items-center"
+                      disabled={!selectedTemplate}
+                    >
+                      <Plus size={18} className="mr-1" /> Adicionar
+                    </button>
+                  </div>
+                  
+                  {selectedTemplate && previewTemplate && (
+                    <div className="mt-2">
+                      <div className="bg-white p-4 rounded-lg border border-gray-200">
+                        <div className="flex items-center justify-between mb-3">
+                          <h3 className="font-medium text-gray-800 flex items-center">
+                            <Eye size={16} className="mr-2 text-blue-600" />
+                            Visualização do Modelo
+                          </h3>
+                        </div>
+                        <p className="text-sm text-gray-600 mb-4">{previewTemplate.description}</p>
+                        <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                          {previewTemplate.elements?.map((element: any, index: number) => (
+                            <div key={index}>
+                              {renderFieldPreview(element)}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -420,7 +584,9 @@ export const CreateProjectTask: React.FC = () => {
               <div className="space-y-3 max-h-60 overflow-y-auto">
                 {formData.actions.length === 0 ? (
                   <div className="text-center py-8 bg-gray-50 rounded-lg border border-gray-200">
+                    <Info className="mx-auto h-12 w-12 text-gray-400 mb-2" />
                     <p className="text-gray-500">Adicione ações do modelo para esta tarefa</p>
+                    <p className="text-sm text-gray-400 mt-1">As ações definem o que o responsável precisará fazer para completar a tarefa</p>
                   </div>
                 ) : (
                   formData.actions.map((action) => (
@@ -432,13 +598,17 @@ export const CreateProjectTask: React.FC = () => {
                           </div>
                           <div>
                             <h4 className="font-medium text-gray-900">{action.title}</h4>
-                            <p className="text-sm text-gray-500 line-clamp-1">{action.description}</p>
+                            <p className="text-sm text-gray-500 line-clamp-1">
+                              {action.type === 'document' 
+                                ? `${action.data?.steps?.length || 0} campos para preencher` 
+                                : action.description}
+                            </p>
                           </div>
                         </div>
                         <button
                           type="button"
                           onClick={() => handleRemoveAction(action.id)}
-                          className="text-gray-400 hover:text-red-500 transition-colors p-1 rounded-full hover:bg-gray-100"
+                          className="text-gray-400 hover:text-red-500 transition-colors p-1 rounded-full hover:bg-red-50"
                           title="Remover ação"
                         >
                           <Trash2 size={18} />
