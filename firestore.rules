@@ -1,0 +1,76 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Funções auxiliares
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function getUserRole() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    }
+    
+    function isAdmin() {
+      return isAuthenticated() && getUserRole() == 'admin';
+    }
+    
+    function isManager() {
+      return isAuthenticated() && getUserRole() == 'manager';
+    }
+
+    function isEmployee() {
+      return isAuthenticated() && getUserRole() == 'employee';
+    }
+
+    // Regras para usuários
+    match /users/{userId} {
+      allow read: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
+      allow create: if isAdmin();
+      allow update: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
+      allow delete: if isAdmin();
+    }
+
+    // Regras para projetos
+    match /projects/{projectId} {
+      allow read: if isAuthenticated();
+      allow create: if isAdmin() || isManager();
+      allow update: if isAdmin() || 
+        (isManager() && resource.data.managers.hasAny([request.auth.uid]));
+      allow delete: if isAdmin();
+    }
+
+    // Regras para tarefas
+    match /tasks/{taskId} {
+      allow read: if isAuthenticated() && 
+        (isAdmin() || 
+         isManager() || 
+         resource.data.assignedTo.hasAny([request.auth.uid]));
+      
+      allow create: if isAuthenticated() && (isAdmin() || isManager());
+      
+      allow update: if isAuthenticated() && (
+        isAdmin() || 
+        isManager() || 
+        resource.data.assignedTo.hasAny([request.auth.uid])
+      );
+      
+      allow delete: if isAdmin() || isManager();
+    }
+
+    // Regras para recompensas
+    match /rewards/{rewardId} {
+      allow read: if isAuthenticated() && 
+        (isAdmin() || request.auth.uid == resource.data.userId);
+      allow create: if isAdmin() || isManager();
+      allow delete: if isAdmin();
+    }
+
+    // Regras para notificações
+    match /notifications/{notificationId} {
+      allow read, update: if isAuthenticated() && 
+        request.auth.uid == resource.data.userId;
+      allow create: if isAuthenticated();
+      allow delete: if isAdmin();
+    }
+  }
+}

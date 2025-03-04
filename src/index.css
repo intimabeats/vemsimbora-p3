@@ -1,0 +1,121 @@
+/* src/index.css */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Estilos globais para melhorar a experiência mobile */
+body {
+  @apply text-base antialiased;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Desabilitar zoom em inputs no iOS */
+input[type="text"],
+input[type="email"],
+input[type="password"],
+textarea,
+select {
+  font-size: 16px;
+}
+
+/* Estilo para rolagem suave */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: theme('colors.blue.300') theme('colors.gray.100');
+}
+
+/* Animações de transição */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.3s ease-out;
+}
+
+:root {
+  --input-height: 56px; /* Default input height */
+}
+
+.fade-out-confetti {
+  animation: fadeOut 1s forwards; /* 1s duration, forwards keeps the final state */
+}
+
+@keyframes fadeOut {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+/* --- TipTap Editor Styles --- */
+
+/* Basic styles for the editor container */
+.tiptap-editor-styles {
+  border: 1px solid #ced4da; /* Light gray border */
+  border-radius: 0.25rem; /* Rounded corners */
+  padding: 1rem; /* More padding */
+  background-color: #fff; /* White background */
+  min-height: 200px;
+  display: flex;
+}
+
+/* Style for the line numbers */
+.tiptap-editor-styles .line-number-container {
+    width: 32px; /* Fixed width for line numbers */
+    text-align: right;
+    padding-right: 0.5rem; /* Space between numbers and content */
+    color: #aaa; /* Light gray color for numbers */
+    user-select: none; /* Prevent selection of line numbers */
+    border-right: 1px solid #ddd;
+    margin-right: 0.5rem;
+}
+
+/* Style for the actual editor content */
+.tiptap-editor-styles .ProseMirror {
+  flex-grow: 1; /* Allow the editor to fill available space */
+  outline: none; /* Remove default focus outline */
+  color: #000; /* Black text color */
+}
+
+/* Style the active button */
+.tiptap-editor-styles button.is-active {
+    background-color: #60a5fa; /* Example active color */
+    color: white;
+}
+
+/* Placeholder styles (optional, customize as needed) */
+.tiptap-editor-styles .ProseMirror p.is-editor-empty:first-child::before {
+  color: #adb5bd;
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+}
+
+
+/* Added these styles for a cleaner look, similar to Google Docs */
+.tiptap-editor-styles .ProseMirror p,
+.tiptap-editor-styles .ProseMirror h1,
+.tiptap-editor-styles .ProseMirror h2,
+.tiptap-editor-styles .ProseMirror h3,
+.tiptap-editor-styles .ProseMirror ul,
+.tiptap-editor-styles .ProseMirror ol,
+.tiptap-editor-styles .ProseMirror pre {
+    margin-bottom: 0.75rem; /* Consistent spacing between elements */
+}
+
+.tiptap-editor-styles .ProseMirror ul,
+.tiptap-editor-styles .ProseMirror ol {
+    padding-left: 1.5rem; /* Indentation for lists */
+}
+
+/* Ensure text inside regular inputs and textareas is black */
+.tiptap-editor-styles input[type="text"],
+.tiptap-editor-styles textarea {
+  color: #000; /* Black text */
+}
